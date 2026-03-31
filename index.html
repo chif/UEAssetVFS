@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UE Asset VFS — AI agents for Unreal Engine assets</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #161922;
+    --bg3: #1e2230;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #0ea5e9;
+    --border: #2a2f3e;
+    --code-bg: #1a1e2e;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --dim: #475569;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Language toggle */
+  .lang-toggle {
+    position: fixed; top: 20px; right: 24px; z-index: 100;
+    display: flex; border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; background: var(--bg2);
+  }
+  .lang-toggle button {
+    background: transparent; color: var(--text2); border: none;
+    padding: 6px 14px; font-size: 14px; cursor: pointer; transition: all 0.2s;
+  }
+  .lang-toggle button.active { background: var(--accent2); color: #fff; }
+  .lang-toggle button:hover:not(.active) { color: var(--text); }
+  [data-lang="en"] { display: none; }
+  body.en [data-lang="en"] { display: revert; }
+  body.en [data-lang="ru"] { display: none; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+
+  /* Hero */
+  .hero { padding: 120px 0 80px; text-align: center; }
+  .hero-badge {
+    display: inline-block; border: 1px solid var(--border); border-radius: 20px;
+    padding: 4px 16px; font-size: 13px; color: var(--accent);
+    margin-bottom: 24px; letter-spacing: 0.5px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 5vw, 52px); font-weight: 700;
+    line-height: 1.15; margin-bottom: 20px; letter-spacing: -0.5px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p { font-size: 19px; color: var(--text2); max-width: 620px; margin: 0 auto; }
+
+  h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.3px; }
+  .section-sub { color: var(--text2); font-size: 17px; margin-bottom: 40px; }
+
+  /* Cards grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+  }
+  .card .icon { font-size: 28px; margin-bottom: 12px; }
+  .card h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .card p { font-size: 14px; color: var(--text2); }
+  .card h3 .dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: middle;
+  }
+
+  /* Steps */
+  .steps { display: flex; gap: 20px; align-items: flex-start; }
+  @media (max-width: 700px) { .steps { flex-direction: column; } }
+  .step { flex: 1; text-align: center; }
+  .step-num {
+    width: 48px; height: 48px; border-radius: 50%; background: var(--accent2);
+    color: #fff; font-size: 20px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  .step h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .step p { font-size: 14px; color: var(--text2); }
+  .step-arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: var(--text2); padding-top: 12px; flex: 0 0 32px;
+  }
+  @media (max-width: 700px) { .step-arrow { transform: rotate(90deg); padding-top: 0; } }
+
+  /* Diagram */
+  .diagram {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px; margin-top: 40px; overflow-x: auto;
+  }
+  .diagram-flow {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; flex-wrap: wrap; font-size: 14px;
+  }
+  .diagram-box {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 18px; text-align: center; white-space: nowrap;
+  }
+  .diagram-box.highlight { border-color: var(--accent2); background: rgba(14,165,233,0.1); }
+  .diagram-arrow { color: var(--accent); font-size: 20px; }
+
+  /* Code */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 24px; overflow-x: auto;
+    font-family: 'JetBrains Mono','Fira Code','Cascadia Code', monospace;
+    font-size: 13px; line-height: 1.7; margin: 16px 0;
+  }
+  code {
+    font-family: 'JetBrains Mono','Fira Code','Cascadia Code', monospace;
+    font-size: 13px;
+  }
+  .c { color: #6b7280; }
+  .k { color: var(--accent); }
+  .s { color: var(--green); }
+  .p { color: var(--orange); }
+
+  /* Chat-style examples */
+  .chat { margin: 24px 0; display: flex; flex-direction: column; gap: 12px; }
+  .chat-msg {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; max-width: 85%;
+  }
+  .chat-msg.user { align-self: flex-end; border-color: var(--accent2); }
+  .chat-msg.agent { align-self: flex-start; }
+  .chat-who {
+    font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+  .chat-who.user-name { color: var(--accent); }
+  .chat-who.agent-name { color: var(--green); }
+  .chat-msg p { font-size: 14px; color: var(--text2); }
+  .chat-msg pre { margin: 8px 0 0; font-size: 12px; padding: 12px 16px; }
+
+  /* Setup */
+  .setup-steps {
+    display: flex; flex-direction: column; gap: 24px; counter-reset: setup;
+  }
+  .setup-step {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; counter-increment: setup;
+  }
+  .setup-step h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .setup-step h3::before { content: counter(setup) ". "; color: var(--accent); font-weight: 700; }
+  .setup-step p { font-size: 14px; color: var(--text2); margin-bottom: 8px; }
+  .setup-step pre { margin: 10px 0 0; }
+
+  /* FAQ */
+  .faq-item { border-bottom: 1px solid var(--border); padding: 20px 0; }
+  .faq-item:last-child { border-bottom: none; }
+  .faq-q {
+    font-weight: 600; font-size: 16px; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .faq-q::before {
+    content: "Q"; color: var(--accent); font-weight: 700; font-size: 14px;
+    flex-shrink: 0; width: 24px; height: 24px;
+    border: 1px solid var(--accent2); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .faq-a { font-size: 15px; color: var(--text2); padding-left: 32px; }
+
+  /* Bonus */
+  .bonus {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px; margin-top: 16px;
+  }
+  .bonus h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .bonus p { font-size: 15px; color: var(--text2); }
+
+  details summary { list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+
+  footer {
+    padding: 40px 0; text-align: center; color: var(--text2);
+    font-size: 13px; border-top: 1px solid var(--border);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="lang-toggle">
+  <button class="active" onclick="setLang('ru')">RU</button>
+  <button onclick="setLang('en')">EN</button>
+</div>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
+    <div data-lang="ru">
+      <div class="hero-badge">Windows &bull; Unreal Engine 5 &bull; MCP</div>
+      <h1>AI-агенты, которые<br><span>понимают ваши ассеты</span></h1>
+      <p>Asset VFS превращает бинарные .uasset файлы в обычный текст. Агенты читают, ищут и редактируют ассеты Unreal Engine так же легко, как исходный код.</p>
+    </div>
+    <div data-lang="en">
+      <div class="hero-badge">Windows &bull; Unreal Engine 5 &bull; MCP</div>
+      <h1>AI agents that<br><span>understand your assets</span></h1>
+      <p>Asset VFS turns binary .uasset files into plain text. Agents read, search, and edit Unreal Engine assets as easily as source code.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROBLEM ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Проблема</h2>
+      <p class="section-sub">AI-агенты отлично работают с кодом &mdash; но ассеты UE для них закрыты.</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="icon">&#128230;</div>
+          <h3>Ассеты &mdash; бинарные</h3>
+          <p>Файлы .uasset невозможно прочитать как текст. Агент не может заглянуть внутрь Data Asset, Blueprint или графа, не используя специальные API.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128679;</div>
+          <h3>Барьер между кодом и данными</h3>
+          <p>Агент видит C++ и конфиги, но не знает, какие значения выставлены в ассетах. Половина проекта для него невидима.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9997;&#65039;</div>
+          <h3>Нельзя менять без API</h3>
+          <p>Чтобы изменить свойство ассета программно, нужно писать Python-скрипт через UE API &mdash; для каждого типа свой подход.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128269;</div>
+          <h3>Нельзя искать</h3>
+          <p>Найти все ассеты с определённым классом или зависимостью? Только через AssetRegistry API, не через обычный поиск.</p>
+        </div>
+      </div>
+    </div>
+    <div data-lang="en">
+      <h2>The Problem</h2>
+      <p class="section-sub">AI agents work great with code &mdash; but UE assets are a black box.</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="icon">&#128230;</div>
+          <h3>Assets are binary</h3>
+          <p>.uasset files can't be read as text. An agent can't look inside a Data Asset, Blueprint, or graph without specialized APIs.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128679;</div>
+          <h3>Wall between code and data</h3>
+          <p>The agent sees C++ and configs but doesn't know what values are set in assets. Half the project is invisible.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9997;&#65039;</div>
+          <h3>Can't edit without API</h3>
+          <p>To change an asset property programmatically, you need a Python script via UE API &mdash; a different approach for each type.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128269;</div>
+          <h3>Can't search</h3>
+          <p>Find all assets with a specific class or dependency? Only through AssetRegistry API, not a simple search.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HOW IT WORKS ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Как работает Asset VFS</h2>
+      <p class="section-sub">Фоновый процесс создаёт виртуальную папку, где каждый ассет &mdash; текстовый файл в формате T3D. Агент работает с ними как с обычными файлами.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Монтирование</h3>
+          <p>VFS создаёт папку с двумя разделами: <b>meta/</b> (быстрые метаданные) и <b>content/</b> (полное содержимое).</p>
+        </div>
+        <div class="step-arrow">&rarr;</div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Чтение</h3>
+          <p>Агент открывает .t3d файл &mdash; VFS запрашивает данные у работающего редактора и возвращает текст.</p>
+        </div>
+        <div class="step-arrow">&rarr;</div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Запись</h3>
+          <p>Агент сохраняет изменённый текст &mdash; VFS автоматически применяет правки в редакторе.</p>
+        </div>
+      </div>
+      <div class="diagram">
+        <div class="diagram-flow">
+          <div class="diagram-box">AI-агент<br><small style="color:var(--text2)">(Claude Code, Cursor, скрипт)</small></div>
+          <div class="diagram-arrow">&harr;</div>
+          <div class="diagram-box highlight">Asset VFS<br><small style="color:var(--accent)">виртуальная папка на диске</small></div>
+          <div class="diagram-arrow">&harr;</div>
+          <div class="diagram-box">Unreal Editor<br><small style="color:var(--text2)">работающий экземпляр</small></div>
+        </div>
+      </div>
+    </div>
+    <div data-lang="en">
+      <h2>How Asset VFS Works</h2>
+      <p class="section-sub">A background process creates a virtual folder where every asset is a text file in T3D format. The agent works with them like regular files.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Mount</h3>
+          <p>VFS creates a folder with two sections: <b>meta/</b> (fast metadata) and <b>content/</b> (full content).</p>
+        </div>
+        <div class="step-arrow">&rarr;</div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Read</h3>
+          <p>Agent opens a .t3d file &mdash; VFS fetches data from the running editor and returns text.</p>
+        </div>
+        <div class="step-arrow">&rarr;</div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Write</h3>
+          <p>Agent saves modified text &mdash; VFS automatically applies changes in the editor.</p>
+        </div>
+      </div>
+      <div class="diagram">
+        <div class="diagram-flow">
+          <div class="diagram-box">AI Agent<br><small style="color:var(--text2)">(Claude Code, Cursor, script)</small></div>
+          <div class="diagram-arrow">&harr;</div>
+          <div class="diagram-box highlight">Asset VFS<br><small style="color:var(--accent)">virtual folder on disk</small></div>
+          <div class="diagram-arrow">&harr;</div>
+          <div class="diagram-box">Unreal Editor<br><small style="color:var(--text2)">running instance</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHAT AGENTS CAN DO ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Что могут агенты</h2>
+      <p class="section-sub">С Asset VFS агент получает полный доступ к данным проекта &mdash; не только к коду.</p>
+      <div class="grid-3">
+        <div class="card">
+          <h3><span class="dot"></span>Читать ассеты</h3>
+          <p>Заглянуть внутрь любого Data Asset, графа или таблицы &mdash; без специальных скриптов.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Менять свойства</h3>
+          <p>Отредактировать значение, ссылку или настройку &mdash; как обычный текстовый файл.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Искать по метаданным</h3>
+          <p>Найти ассеты нужного класса, проверить зависимости &mdash; быстрый поиск по meta/.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Создавать ассеты</h3>
+          <p>Записать .t3d файл &mdash; в проекте появится новый ассет нужного типа.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Массовые правки</h3>
+          <p>Пройтись по десяткам ассетов и поменять значения за секунды.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Понимать контекст</h3>
+          <p>Видеть и код, и данные &mdash; давать более точные ответы и предложения.</p>
+        </div>
+      </div>
+    </div>
+    <div data-lang="en">
+      <h2>What Agents Can Do</h2>
+      <p class="section-sub">With Asset VFS, the agent gets full access to project data &mdash; not just code.</p>
+      <div class="grid-3">
+        <div class="card">
+          <h3><span class="dot"></span>Read assets</h3>
+          <p>Look inside any Data Asset, graph, or data table &mdash; no special scripts needed.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Change properties</h3>
+          <p>Edit a value, reference, or setting &mdash; just like a regular text file.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Search metadata</h3>
+          <p>Find assets by class, check dependencies &mdash; fast search across meta/.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Create assets</h3>
+          <p>Write a .t3d file &mdash; a new asset of the right type appears in the project.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Bulk edits</h3>
+          <p>Walk through dozens of assets and change values in seconds.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Understand context</h3>
+          <p>See both code and data &mdash; give more accurate answers and suggestions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== EXAMPLES ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Примеры</h2>
+      <p class="section-sub">Как выглядит работа агента с ассетами через VFS.</p>
+
+      <h3 style="margin-bottom: 16px;">Чтение и редактирование</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">Вы</div>
+          <p>Посмотри какой урон у меча DA_Weapon_IronSword</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Агент</div>
+          <p>Читаю ассет через VFS...</p>
+          <pre><span class="c"># Агент открывает файл из content/</span>
+Begin Object Class=/Script/MyGame.WeaponDataAsset Name="DA_Weapon_IronSword"
+    <span class="k">DisplayName</span>=<span class="s">"Iron Sword"</span>
+    <span class="k">BaseDamage</span>=<span class="s">25.0</span>
+    <span class="k">AttackSpeed</span>=<span class="s">1.2</span>
+    <span class="k">DamageType</span>=<span class="s">Physical</span>
+End Object</pre>
+          <p>Базовый урон &mdash; <b>25.0</b>, скорость атаки &mdash; <b>1.2</b>, тип урона &mdash; Physical.</p>
+        </div>
+        <div class="chat-msg user">
+          <div class="chat-who user-name">Вы</div>
+          <p>Поставь урон 40 и тип на Fire</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Агент</div>
+          <p>Готово. Изменил BaseDamage на 40.0 и DamageType на Fire.</p>
+          <pre><span class="c"># VFS ответ:</span> UPDATE OK: /Game/Items/Weapons/DA_Weapon_IronSword</pre>
+        </div>
+      </div>
+
+      <h3 style="margin: 32px 0 16px;">Поиск по метаданным</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">Вы</div>
+          <p>Сколько у нас DataTable ассетов в проекте?</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Агент</div>
+          <p>Ищу по метаданным VFS...</p>
+          <pre><span class="c"># Быстрый поиск по meta/ (без нагрузки на редактор)</span>
+grep -r <span class="s">"DataTable"</span> <span class="p">meta/</span> | wc -l
+<span class="s">47</span></pre>
+          <p>В проекте <b>47</b> DataTable ассетов.</p>
+        </div>
+      </div>
+
+      <h3 style="margin: 32px 0 16px;">Создание ассета</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">Вы</div>
+          <p>Создай новое оружие DA_Weapon_FireStaff с уроном 60, тип Fire</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Агент</div>
+          <p>Создаю ассет через VFS...</p>
+          <pre><span class="c"># Агент записывает новый .t3d файл в content/</span>
+Begin Object Class=/Script/MyGame.WeaponDataAsset Name="DA_Weapon_FireStaff"
+    <span class="k">DisplayName</span>=<span class="s">"Fire Staff"</span>
+    <span class="k">BaseDamage</span>=<span class="s">60.0</span>
+    <span class="k">AttackSpeed</span>=<span class="s">0.8</span>
+    <span class="k">DamageType</span>=<span class="s">Fire</span>
+End Object
+
+<span class="c"># VFS ответ:</span> CREATE OK: /Game/Items/Weapons/DA_Weapon_FireStaff (WeaponDataAsset)</pre>
+          <p>Ассет создан и доступен в Content Browser.</p>
+        </div>
+      </div>
+    </div>
+
+    <div data-lang="en">
+      <h2>Examples</h2>
+      <p class="section-sub">What it looks like when an agent works with assets through VFS.</p>
+
+      <h3 style="margin-bottom: 16px;">Reading and editing</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">You</div>
+          <p>Check the damage on the sword DA_Weapon_IronSword</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Agent</div>
+          <p>Reading the asset via VFS...</p>
+          <pre><span class="c"># Agent opens a file from content/</span>
+Begin Object Class=/Script/MyGame.WeaponDataAsset Name="DA_Weapon_IronSword"
+    <span class="k">DisplayName</span>=<span class="s">"Iron Sword"</span>
+    <span class="k">BaseDamage</span>=<span class="s">25.0</span>
+    <span class="k">AttackSpeed</span>=<span class="s">1.2</span>
+    <span class="k">DamageType</span>=<span class="s">Physical</span>
+End Object</pre>
+          <p>Base damage is <b>25.0</b>, attack speed <b>1.2</b>, damage type Physical.</p>
+        </div>
+        <div class="chat-msg user">
+          <div class="chat-who user-name">You</div>
+          <p>Set damage to 40 and type to Fire</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Agent</div>
+          <p>Done. Changed BaseDamage to 40.0 and DamageType to Fire.</p>
+          <pre><span class="c"># VFS response:</span> UPDATE OK: /Game/Items/Weapons/DA_Weapon_IronSword</pre>
+        </div>
+      </div>
+
+      <h3 style="margin: 32px 0 16px;">Metadata search</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">You</div>
+          <p>How many DataTable assets do we have in the project?</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Agent</div>
+          <p>Searching VFS metadata...</p>
+          <pre><span class="c"># Fast search across meta/ (no editor overhead)</span>
+grep -r <span class="s">"DataTable"</span> <span class="p">meta/</span> | wc -l
+<span class="s">47</span></pre>
+          <p>The project has <b>47</b> DataTable assets.</p>
+        </div>
+      </div>
+
+      <h3 style="margin: 32px 0 16px;">Creating an asset</h3>
+      <div class="chat">
+        <div class="chat-msg user">
+          <div class="chat-who user-name">You</div>
+          <p>Create a new weapon DA_Weapon_FireStaff with 60 damage, Fire type</p>
+        </div>
+        <div class="chat-msg agent">
+          <div class="chat-who agent-name">Agent</div>
+          <p>Creating asset via VFS...</p>
+          <pre><span class="c"># Agent writes a new .t3d file to content/</span>
+Begin Object Class=/Script/MyGame.WeaponDataAsset Name="DA_Weapon_FireStaff"
+    <span class="k">DisplayName</span>=<span class="s">"Fire Staff"</span>
+    <span class="k">BaseDamage</span>=<span class="s">60.0</span>
+    <span class="k">AttackSpeed</span>=<span class="s">0.8</span>
+    <span class="k">DamageType</span>=<span class="s">Fire</span>
+End Object
+
+<span class="c"># VFS response:</span> CREATE OK: /Game/Items/Weapons/DA_Weapon_FireStaff (WeaponDataAsset)</pre>
+          <p>Asset created and available in Content Browser.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== VFS STRUCTURE ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Структура VFS</h2>
+      <p class="section-sub">Виртуальная папка повторяет структуру проекта. Каждый .uasset &rarr; .t3d текстовый файл.</p>
+<pre>
+<span class="p">C:\Users\You\AppData\Local\AssetVFS\MyProject\</span>
+<span class="k">meta/</span>                            <span class="c"># метаданные (быстро, без IPC к редактору)</span>
+  Characters/
+    DA_Hero.t3d                  <span class="c"># класс, зависимости, теги</span>
+  Items/Weapons/
+    DA_Weapon_IronSword.t3d
+<span class="k">content/</span>                         <span class="c"># полное содержимое (чтение + запись)</span>
+  Characters/
+    DA_Hero.t3d                  <span class="c"># все свойства ассета как текст</span>
+  Items/Weapons/
+    DA_Weapon_IronSword.t3d
+</pre>
+      <p style="color:var(--text2);font-size:14px;margin-top:12px;"><b>meta/</b> &mdash; мгновенный доступ, кеш из AssetRegistry. <b>content/</b> &mdash; полный экспорт, данные загружаются из редактора при первом обращении.</p>
+    </div>
+    <div data-lang="en">
+      <h2>VFS Structure</h2>
+      <p class="section-sub">The virtual folder mirrors your project structure. Each .uasset &rarr; .t3d text file.</p>
+<pre>
+<span class="p">C:\Users\You\AppData\Local\AssetVFS\MyProject\</span>
+<span class="k">meta/</span>                            <span class="c"># metadata (fast, no editor IPC)</span>
+  Characters/
+    DA_Hero.t3d                  <span class="c"># class, dependencies, tags</span>
+  Items/Weapons/
+    DA_Weapon_IronSword.t3d
+<span class="k">content/</span>                         <span class="c"># full content (read + write)</span>
+  Characters/
+    DA_Hero.t3d                  <span class="c"># all asset properties as text</span>
+  Items/Weapons/
+    DA_Weapon_IronSword.t3d
+</pre>
+      <p style="color:var(--text2);font-size:14px;margin-top:12px;"><b>meta/</b> &mdash; instant access, cached from AssetRegistry. <b>content/</b> &mdash; full export, data is fetched from the editor on first access.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== BONUS ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <div class="bonus">
+        <h3>Работает и без агента</h3>
+        <p>Asset VFS &mdash; это обычная папка на диске. Вы можете открывать .t3d файлы в любом текстовом редакторе, искать по ним grep-ом, или писать собственные скрипты для автоматизации. Агент не обязателен &mdash; это просто самый удобный способ.</p>
+      </div>
+    </div>
+    <div data-lang="en">
+      <div class="bonus">
+        <h3>Works without an agent too</h3>
+        <p>Asset VFS is just a regular folder on disk. You can open .t3d files in any text editor, search them with grep, or write your own scripts for automation. An agent isn't required &mdash; it's just the most convenient way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section>
+  <div class="container">
+    <div data-lang="ru">
+      <h2>Частые вопросы</h2>
+      <div class="faq-item">
+        <div class="faq-q">Нужен ли запущенный Unreal Editor?</div>
+        <div class="faq-a">Да, для чтения полного содержимого (<b>content/</b>) и для записи. Метаданные (<b>meta/</b>) работают с кешем.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Это безопасно?</div>
+        <div class="faq-a">Да. Все изменения применяются через стандартные механизмы редактора &mdash; так же, как ручное редактирование. Рекомендуется использовать Git.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">С какими агентами работает?</div>
+        <div class="faq-a">С любыми, которые поддерживают MCP (Model Context Protocol): Claude Code, Cursor, и другие. Также работает как обычная файловая система для скриптов.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Работает на Mac или Linux?</div>
+        <div class="faq-a">Нет. Asset VFS использует Windows Projected File System (ProjFS) &mdash; только Windows 10/11.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Какие версии UE?</div>
+        <div class="faq-a">Unreal Engine 5.x. Нужен включённый плагин Python Editor Script (включён по умолчанию).</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Замедляет ли редактор?</div>
+        <div class="faq-a">Нет. VFS работает в отдельном процессе и обращается к редактору только при чтении или записи файла.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Что такое T3D?</div>
+        <div class="faq-a">Встроенный текстовый формат UE для описания объектов. Тот же формат используется при копировании через буфер обмена в редакторе.</div>
+      </div>
+    </div>
+    <div data-lang="en">
+      <h2>FAQ</h2>
+      <div class="faq-item">
+        <div class="faq-q">Does the Unreal Editor need to be running?</div>
+        <div class="faq-a">Yes, for reading full content (<b>content/</b>) and writing. Metadata (<b>meta/</b>) works from cache.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Is it safe?</div>
+        <div class="faq-a">Yes. All changes go through standard editor mechanisms &mdash; same as manual editing. We recommend using Git.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Which agents does it work with?</div>
+        <div class="faq-a">Any agent supporting MCP (Model Context Protocol): Claude Code, Cursor, and others. Also works as a regular filesystem for scripts.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Does it work on Mac or Linux?</div>
+        <div class="faq-a">No. Asset VFS uses Windows Projected File System (ProjFS) &mdash; Windows 10/11 only.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Which UE versions?</div>
+        <div class="faq-a">Unreal Engine 5.x. Requires the Python Editor Script plugin (enabled by default).</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Does it slow down the editor?</div>
+        <div class="faq-a">No. VFS runs in a separate process and only contacts the editor when reading or writing a file.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">What is T3D?</div>
+        <div class="faq-a">UE's built-in text format for describing objects. The same format used when copying via clipboard in the editor.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div data-lang="ru">
+      <p>UE Asset VFS. <a href="https://github.com/chif/UEAssetVFS">GitHub</a></p>
+      <details style="margin-top:20px;text-align:left;">
+        <summary style="cursor:pointer;color:var(--dim);font-size:12px;">Инструкция по установке</summary>
+        <div style="margin-top:12px;font-size:13px;color:var(--text2);">
+          <p><b>1.</b> Включите ProjFS (PowerShell от админа):</p>
+          <pre style="font-size:12px;">Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -NoRestart</pre>
+          <p><b>2.</b> Установите .NET 8: <code style="font-size:12px;">winget install Microsoft.DotNet.Runtime.8</code></p>
+          <p><b>3.</b> Соберите провайдер: <code style="font-size:12px;">cd Scripts/AssetVFS/ProjFSProvider && dotnet build -c Release</code></p>
+          <p><b>4.</b> Добавьте MCP-сервер в <code>.mcp.json</code> проекта.</p>
+          <p><b>5.</b> Откройте UE Editor, вызовите <code>asset_status</code> &mdash; VFS запустится.</p>
+        </div>
+      </details>
+    </div>
+    <div data-lang="en">
+      <p>UE Asset VFS. <a href="https://github.com/chif/UEAssetVFS">GitHub</a></p>
+      <details style="margin-top:20px;text-align:left;">
+        <summary style="cursor:pointer;color:var(--dim);font-size:12px;">Installation guide</summary>
+        <div style="margin-top:12px;font-size:13px;color:var(--text2);">
+          <p><b>1.</b> Enable ProjFS (PowerShell as admin):</p>
+          <pre style="font-size:12px;">Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -NoRestart</pre>
+          <p><b>2.</b> Install .NET 8: <code style="font-size:12px;">winget install Microsoft.DotNet.Runtime.8</code></p>
+          <p><b>3.</b> Build provider: <code style="font-size:12px;">cd Scripts/AssetVFS/ProjFSProvider && dotnet build -c Release</code></p>
+          <p><b>4.</b> Add MCP server to your project's <code>.mcp.json</code>.</p>
+          <p><b>5.</b> Open UE Editor, call <code>asset_status</code> &mdash; VFS starts automatically.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</footer>
+
+<script>
+function setLang(lang) {
+  document.body.className = lang === 'en' ? 'en' : '';
+  document.querySelectorAll('.lang-toggle button').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === lang.toUpperCase()));
+  localStorage.setItem('assetvfs-lang', lang);
+}
+const saved = localStorage.getItem('assetvfs-lang');
+if (saved) setLang(saved);
+</script>
+</body>
+</html>
